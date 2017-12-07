@@ -15,29 +15,36 @@ async function getKittyGenome(startKitty, stopKitty){
 	const browser = await puppeteer.launch();
 	let maxKitty = stopKitty;
 	for (let currKitty = startKitty; currKitty < maxKitty; currKitty++) {
+
 		try {
-			const page = await browser.newPage();	
-			page.setViewport({ height: 1200, width: 1800})
-			page.on('response', async (response) => {
-				if (response.request().url.indexOf('.svg') > 0) { 
-					saveFile(`${currKitty}.svg`, (await response.buffer()))					
-				} else if (response.request().url.indexOf('.png') > 0) { 
-					saveFile(`${currKitty}.png`, (await response.buffer()));					
-				} 
-			});
-			await page.goto(`https://cryptokittydex.com/kitties/${currKitty}`, { waitUntil: 'networkidle2' });
-			await page.content();
-			let result = await page.evaluate(() => {
-				const owner = document.querySelector('.list-unstyled').children[0].children[0].innerHTML;
-				const gen = document.querySelector('.list-unstyled').children[2].children[0].innerHTML;
-				const genesList = document.querySelector('.list-unstyled').querySelector('ul').children;
-				let genes = '0x';
-				for (var i = 0; i < genesList.length; i++) { genes =  genes + genesList[i].children[0].innerHTML; }
-				return { owner, genes, gen };
-			}); 
-			winston.info(currKitty, result);
-			saveFile(`${currKitty}.json`, new Buffer(JSON.stringify(result, null, '\t'), 'binary'))
-			page.close();
+			const kittyGenomeExists = await checkKittyGenomeExists(currKitty);
+
+			if (!kittyGenomeExists){
+				const page = await browser.newPage();	
+				page.setViewport({ height: 1200, width: 1800})
+				page.on('response', async (response) => {
+					if (response.request().url.indexOf('.svg') > 0) { 
+						saveFile(`${currKitty}.svg`, (await response.buffer()))					
+					} else if (response.request().url.indexOf('.png') > 0) { 
+						saveFile(`${currKitty}.png`, (await response.buffer()));					
+					} 
+				});
+				await page.goto(`https://cryptokittydex.com/kitties/${currKitty}`, { waitUntil: 'networkidle2' });
+				await page.content();
+				let result = await page.evaluate(() => {
+					const owner = document.querySelector('.list-unstyled').children[0].children[0].innerHTML;
+					const gen = document.querySelector('.list-unstyled').children[2].children[0].innerHTML;
+					const genesList = document.querySelector('.list-unstyled').querySelector('ul').children;
+					let genes = '0x';
+					for (var i = 0; i < genesList.length; i++) { genes =  genes + genesList[i].children[0].innerHTML; }
+					return { owner, genes, gen };
+				}); 
+				winston.info(currKitty, result);
+				saveFile(`${currKitty}.json`, new Buffer(JSON.stringify(result, null, '\t'), 'binary'))
+				page.close();
+			} else {
+				winston.info(`Kitty #${currKitty} already exists`);
+			}
 		} catch (e) {
 			console.error(e);
 		}
@@ -107,6 +114,25 @@ function saveFile(fileName, buffer) {
 		fs.writeFileSync(path.join(dataDir,fileName), buffer);
 		winston.info('Successfully saved file.');
 	}
+}
+
+async function checkKittyGenomeExists(kittyId) {
+	return new Promise((resolve, reject) => {
+		if (process.env.NODE_ENV === 'production') {
+			s3.headObject({
+				Bucket: bucketName,
+				Key: `${kittyId}.json`
+			}, function (err, metadata) {  
+				if (err && err.code === 'NotFound') {  
+					resolve(false);
+				} else {  
+					resolve(true);
+				}
+			});
+		} else {
+			resolve(fs.existsSync(path.join(dataDir,fileName)));
+		}
+	})
 }
 
 main()
