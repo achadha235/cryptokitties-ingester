@@ -1,0 +1,19 @@
+{
+  "name": "kittydata",
+  "version": "1.0.0",
+  "description": "Open source data to study crypotokitty genomes",
+  "main": "index.js",
+  "author": "Abhishek Chadha",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.165.0",
+    "cryptokitties-contrib": "^0.0.1",
+    "puppeteer": "^0.13.0",
+    "request": "^2.83.0",
+    "web3": "^0.20.2",
+    "winston": "^2.4.0"
+  },
+  "scripts": {
+    "start": "node index.js"
+  }
+}
